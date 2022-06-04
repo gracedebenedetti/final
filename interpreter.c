@@ -228,6 +228,33 @@ Value *evalLet(Value *args, Frame *frame)
   return NULL;
 }
 
+// Value *evalLetStar (Value *value, Frame *frame){
+//   Frame *newFrame = talloc(sizeof(Frame));
+//   newFrame->bindings = frame->bindings;
+//   newFrame->parent = frame;
+//   if (treeLength(args) < 1){
+//     evaluationError("Error: empty arguments to let");
+//   } else {
+//     newFrame->bindings = car(args);
+//     Value* next = cdr(args);
+//     return eval(next, newFrame);
+//   }
+//   return NULL;
+// }
+
+Value *evalBegin (Value *args, Frame *frame){
+  while (args->type != NULL_TYPE){
+    Value *begin = eval(car(args), frame);
+    if (cdr(args)->type == NULL_TYPE){
+      return begin;
+    }
+    args = cdr(args);
+  }
+  Value *special = talloc(sizeof(Value));
+  special->type = VOID_TYPE;
+  return special;
+}
+
 Value *evalEach(Value *args, Frame *frame){
   Value *evaledArgs = makeNull();
   Value *cur = args;
