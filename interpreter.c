@@ -735,6 +735,10 @@ Value *eval(Value *tree, Frame *frame)
       {
         return evalOr(cdr(val), frame);
       } 
+      // if (!strcmp(car(val)->s, "cond")) 
+      // {
+      //   return evalCond(cdr(val), frame);
+      // } 
       // if (!strcmp(car(val)->s, "set!")) 
       // {
       //     return evalSetBang(cdr(val), frame);
