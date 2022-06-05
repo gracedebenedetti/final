@@ -174,6 +174,41 @@ Value *lookUpSymbol(Value *symbol, Frame *frame)
   return lookUpSymbol(symbol, frame->parent);
 }
 
+Value *alterBinding(Value *symbol, Value *newVal, Frame *frame)
+{
+  Value *bindings = frame->bindings;
+  Value *cur = bindings;
+  while (cur->type != NULL_TYPE)
+  {
+    //assert(cur->type == CONS_TYPE && "Should be cons type");
+    Value *pairList = car(cur);
+    //assert(pairList != NULL && pairList->type == CONS_TYPE);
+    Value *boundSymbol = car(pairList);
+    assert(boundSymbol->type == SYMBOL_TYPE);
+    if (!strcmp(boundSymbol->s, symbol->s)) // if boundSymbol is equal to symbol, return the boundValue
+    {
+      Value *boundValue = newVal;
+      if (boundValue->type == SYMBOL_TYPE)
+      {
+        return alterBinding(boundValue, newVal, frame->parent);
+      } else if (boundValue->type == CONS_TYPE)
+      {
+        if (getBottomLeftChild(boundValue)->type == INT_TYPE || getBottomLeftChild(boundValue)->type == STR_TYPE || getBottomLeftChild(boundValue)->type == BOOL_TYPE || getBottomLeftChild(boundValue)->type == DOUBLE_TYPE)
+        {
+          return boundValue;
+        }
+        return eval(cdr(pairList), frame);
+      }
+      return boundValue;
+    }
+    cur = cdr(cur);
+  }
+  if (frame->parent == NULL)
+  {
+    return NULL;
+  }
+  return alterBinding(symbol, newVal, frame->parent);
+}
 
 Value *evalQuote(Value *tree){
   
@@ -254,6 +289,8 @@ Value *evalSetBang(Value *args, Frame *frame){
   if (car(args)->type != SYMBOL_TYPE){
     evaluationError("Evaluation error: first argument not of symbol type for set!");
   }
+  Value *updatedBinding = alterBinding(car(args),eval(car(cdr(args)),frame),frame);
+  return eval(updatedBinding, frame);
 }
 
 
@@ -441,9 +478,17 @@ Value *primitiveAdd(Value *args){
 }
 
 Value *primitiveSubtract(Value *args){
+  Value* cur = args;
   double difference = 0;
   bool isDouble = 0;
-  Value* cur = args;
+  if (car(cur)->type == DOUBLE_TYPE){
+    isDouble = 1;
+    difference = car(cur)->d;
+  }
+  else if (car(cur)->type == INT_TYPE) {
+    difference = car(cur)->i;
+  }
+  cur = cdr(args);
   while (cur->type != NULL_TYPE){
     
     if (car(cur)->type == DOUBLE_TYPE)
@@ -474,29 +519,29 @@ Value *primitiveSubtract(Value *args){
 Value *primitiveGreater (Value *args){
   bool firstisDouble = 0;
   bool secondisDouble = 0;
-  double first;
-  double second;
+  double first = 0;
+  double second = 0;
   Value *result = makeNull();
   result->type = BOOL_TYPE;
   Value* cur = args;
   if (car(cur)->type == DOUBLE_TYPE)
     {
       firstisDouble = 1;
-      double first = car(cur)->d;
-    } else if (car(cur)->type == INT_TYPE){
-      int first = car(cur)->i;
-    } else {
-      evaluationError("Evaluation Error: Comparing non-numbers");
-    }
+      first = car(cur)->d;
+  } else if (car(cur)->type == INT_TYPE){
+    first = car(cur)->i;
+  } //else {
+  //   evaluationError("Evaluation Error: Comparing non-numbers"); //very curious as to why this leads to resetting first value
+  // } 
   if (car(cdr(cur))->type == DOUBLE_TYPE)
     {
       secondisDouble = 1;
-      double second = car(cur)->d;
-    } else if (car(cur)->type == INT_TYPE){
-      int second = car(cur)->i;
-    } else {
-      evaluationError("Evaluation Error: comparing non-numbers");
-    }
+      second = car(cdr(cur))->d;
+  } else if (car(cdr(cur))->type == INT_TYPE){
+    second = car(cdr(cur))->i;
+  } else {
+    evaluationError("Evaluation Error: comparing non-numbers");
+  }
   if (first > second){
     result->i = 1;
   } else {
@@ -516,18 +561,19 @@ Value *primitiveLess (Value *args){
   if (car(cur)->type == DOUBLE_TYPE)
     {
       firstisDouble = 1;
-      double first = car(cur)->d;
+      first = car(cur)->d;
     } else if (car(cur)->type == INT_TYPE){
-      int first = car(cur)->i;
-    } else {
-      evaluationError("Evaluation Error: Comparing non-numbers");
-    }
+      first = car(cur)->i;
+    } 
+    //else {
+    //   evaluationError("Evaluation Error: Comparing non-numbers");
+    // }
   if (car(cdr(cur))->type == DOUBLE_TYPE)
     {
       secondisDouble = 1;
-      double second = car(cur)->d;
-    } else if (car(cur)->type == INT_TYPE){
-      int second = car(cur)->i;
+      second = car(cdr(cur))->d;
+    } else if (car(cdr(cur))->type == INT_TYPE){
+      second = car(cdr(cur))->i;
     } else {
       evaluationError("Evaluation Error: comparing non-numbers");
     }
@@ -550,18 +596,19 @@ Value *primitiveEqual (Value *args){
   if (car(cur)->type == DOUBLE_TYPE)
     {
       firstisDouble = 1;
-      double first = car(cur)->d;
+      first = car(cur)->d;
     } else if (car(cur)->type == INT_TYPE){
-      int first = car(cur)->i;
-    } else {
-      evaluationError("Evaluation Error: Comparing non-numbers");
-    }
+      first = car(cur)->i;
+    } 
+    // else {
+    //   evaluationError("Evaluation Error: Comparing non-numbers");
+    // }
   if (car(cdr(cur))->type == DOUBLE_TYPE)
     {
       secondisDouble = 1;
-      double second = car(cur)->d;
-    } else if (car(cur)->type == INT_TYPE){
-      int second = car(cur)->i;
+      second = car(cdr(cur))->d;
+    } else if (car(cdr(cur))->type == INT_TYPE){
+      second = car(cdr(cur))->i;
     } else {
       evaluationError("Evaluation Error: comparing non-numbers");
     }
@@ -729,6 +776,7 @@ void interpret(Value *tree)
   while (curr->type != NULL_TYPE)
   {
     bind("+", primitiveAdd, frame);
+    bind("-", primitiveSubtract, frame);
     bind("null?", primitiveNull, frame);
     bind("car", primitiveCar, frame);
     bind("cdr", primitiveCdr, frame);
