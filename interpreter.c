@@ -244,6 +244,19 @@ Value *evalLetStar(Value *args, Frame *frame)
   return eval(next, newFrame);
 }
 
+Value *evalSetBang(Value *args, Frame *frame){
+  if (args->type == NULL_TYPE){
+    evaluationError("Evaluation error: no args for set!");
+  }
+  if (treeLength(args) < 2){
+    evaluationError("Evaluation error: fewer than 2 arguments for set!");
+  }
+  if (car(args)->type != SYMBOL_TYPE){
+    evaluationError("Evaluation error: first argument not of symbol type for set!");
+  }
+}
+
+
 Value *evalBegin (Value *args, Frame *frame){
   while (args->type != NULL_TYPE){
     Value *begin = eval(car(args), frame);
@@ -677,7 +690,7 @@ Value *eval(Value *tree, Frame *frame)
       } 
       // if (!strcmp(car(val)->s, "set!")) 
       // {
-      //     return evalSet(cdr(val), frame);
+      //     return evalSetBang(cdr(val), frame);
       // }
       if (!strcmp(car(val)->s, "let*")) 
       {
