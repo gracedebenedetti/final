@@ -228,19 +228,6 @@ Value *evalLet(Value *args, Frame *frame)
   return NULL;
 }
 
-// Value *evalLetStar (Value *value, Frame *frame){
-//   Frame *newFrame = talloc(sizeof(Frame));
-//   newFrame->bindings = frame->bindings;
-//   newFrame->parent = frame;
-//   if (treeLength(args) < 1){
-//     evaluationError("Error: empty arguments to let");
-//   } else {
-//     newFrame->bindings = car(args);
-//     Value* next = cdr(args);
-//     return eval(next, newFrame);
-//   }
-//   return NULL;
-// }
 
 Value *evalBegin (Value *args, Frame *frame){
   while (args->type != NULL_TYPE){
@@ -586,8 +573,6 @@ Value *primitiveNull(Value *args){
       ret->i = 0;
     }
   }
-
-  
   return ret;
 }
 
@@ -674,6 +659,18 @@ Value *eval(Value *tree, Frame *frame)
       if (!strcmp(car(val)->s, "or")) 
       {
         return evalOr(cdr(val), frame);
+      } 
+      if (!strcmp(first->s, "set!")) 
+      {
+          return = evalSet(args, frame);
+      }
+      if (!strcmp(first->s, "let*")) 
+      {
+          return = evalLetStar(args, frame);
+      }
+      if (!strcmp(first->s, "letrec")) 
+      {
+          return = evalLetRec(args, frame);
       }
       // if (!strcmp(car(val)->s, "+"))
       // {
