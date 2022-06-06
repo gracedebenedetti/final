@@ -353,7 +353,11 @@ Value* alterBinding(Value* symbol, Value* newVal, Frame* frame)
     if (!strcmp(sym->s, symbol->s))
     {
       exprTree->c.car = newVal;
-      return newVal;
+      if (frame->parent == NULL)
+      {
+        return NULL;
+      }
+      return alterBinding(symbol, newVal, frame->parent);
     }
     cur = cdr(cur);
   }
@@ -382,16 +386,9 @@ Value *evalSetBang(Value *args, Frame *frame){
   Value* newVal = car(cdr(args));
   
   Value* ret = alterBinding(symbol, newVal, frame);
-  if (ret == NULL)
-  {
-    evaluationError("Set!: Symbol not found");
-  } else
-  {
-    Value* special = (Value*)talloc(sizeof(Value));
-    special->type = VOID_TYPE;
-    return special;
-  }
-  return NULL;
+  Value* special = (Value*)talloc(sizeof(Value));
+  special->type = VOID_TYPE;
+  return special;
   // Value *updatedBinding = alterBinding(car(args),eval(cdr(args),frame), frame);
   // Value *special = talloc(sizeof(Value));
   // special->type = CONS_TYPE;
