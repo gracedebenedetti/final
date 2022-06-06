@@ -190,7 +190,7 @@ Value *alterBinding(Value *symbol, Value *newVal, Frame *frame)
       Value *boundValue = newVal;
       if (boundValue->type == SYMBOL_TYPE)
       {
-        return alterBinding(boundValue, newVal, frame->parent);
+        return lookUpSymbol(boundValue, frame->parent);
       } else if (boundValue->type == CONS_TYPE)
       {
         if (getBottomLeftChild(boundValue)->type == INT_TYPE || getBottomLeftChild(boundValue)->type == STR_TYPE || getBottomLeftChild(boundValue)->type == BOOL_TYPE || getBottomLeftChild(boundValue)->type == DOUBLE_TYPE)
@@ -207,7 +207,7 @@ Value *alterBinding(Value *symbol, Value *newVal, Frame *frame)
   {
     return NULL;
   }
-  return alterBinding(symbol, newVal, frame->parent);
+  return lookUpSymbol(symbol, frame->parent);
 }
 
 Value *evalQuote(Value *tree){
@@ -296,11 +296,11 @@ Value *evalLetStar(Value *args, Frame *frame)
   // return eval(next, newFrame);
 }
 
-Value* evalLetRec(Value* args, Frame* frame)
-{
-  Value* bindingTreeHead = car(args);
+// Value* evalLetRec(Value* args, Frame* frame)
+// {
+//   Value* bindingTreeHead = car(args);
   
-}
+// }
 
 Value *evalSetBang(Value *args, Frame *frame){
   if (args->type == NULL_TYPE){
@@ -312,20 +312,26 @@ Value *evalSetBang(Value *args, Frame *frame){
   if (car(args)->type != SYMBOL_TYPE){
     evaluationError("Evaluation error: first argument not of symbol type for set!");
   }
-  Value *updatedBinding = alterBinding(car(args),eval(car(cdr(args)),frame),frame);
-  return eval(updatedBinding, frame);
+  Value *updatedBinding = alterBinding(car(args),eval(cdr(args),frame), frame);
+  Value *special = talloc(sizeof(Value));
+  special->type = CONS_TYPE;
+  Value *specialchild = talloc(sizeof(Value));
+  special->type = VOID_TYPE;
+  return special;
 }
 
 
 Value *evalBegin (Value *args, Frame *frame){
   while (args->type != NULL_TYPE){
-    Value *begin = eval(car(args), frame);
+    Value *begin = eval(args, frame);
     if (cdr(args)->type == NULL_TYPE){
       return begin;
     }
     args = cdr(args);
   }
   Value *special = talloc(sizeof(Value));
+  special->type = CONS_TYPE;
+  Value *specialchild = talloc(sizeof(Value));
   special->type = VOID_TYPE;
   return special;
 }
@@ -708,7 +714,8 @@ Value *eval(Value *tree, Frame *frame)
   {
     case INT_TYPE: // this means the whole program consists of one single number, so we can just return the number.
       return val;
-
+    case UNSPECIFIED_TYPE:
+      return val;
     case DOUBLE_TYPE:
       return val;
     case BOOL_TYPE:
@@ -758,22 +765,22 @@ Value *eval(Value *tree, Frame *frame)
       {
         return evalOr(cdr(val), frame);
       } 
-      // if (!strcmp(car(val)->s, "cond")) 
-      // {
-      //   return evalCond(cdr(val), frame);
-      // } 
-      // if (!strcmp(car(val)->s, "set!")) 
-      // {
-      //     return evalSetBang(cdr(val), frame);
-      // }
+      if (!strcmp(car(val)->s, "begin")) 
+      {
+        return evalBegin(cdr(val), frame);
+      } 
+      if (!strcmp(car(val)->s, "set!")) 
+      {
+          return evalSetBang(cdr(val), frame);
+      }
       if (!strcmp(car(val)->s, "let*")) 
       {
           return evalLetStar(cdr(val), frame);
       }
-      if (!strcmp(car(val)->s, "letrec")) 
-      {
-          return evalLetRec(cdr(val), frame);
-      }
+      // if (!strcmp(car(val)->s, "letrec")) 
+      // {
+      //     return evalLetRec(cdr(val), frame);
+      // }
       else
       {
         // If not a special form, evaluate the first, evaluate the args, then
