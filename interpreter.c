@@ -11,7 +11,12 @@
 #include <ctype.h>
 #include "interpreter.h"
 
-
+Value* makeUnspecified()
+{
+  Value* ret = (Value*)talloc(sizeof(Value));
+  ret->type = UNSPECIFIED_TYPE;
+  return ret;
+}
 
 void evaluationError(char *errorMessage)
 {
@@ -174,41 +179,41 @@ Value *lookUpSymbol(Value *symbol, Frame *frame)
   return lookUpSymbol(symbol, frame->parent);
 }
 
-Value *alterBinding(Value *symbol, Value *newVal, Frame *frame)
-{
-  Value *bindings = frame->bindings;
-  Value *cur = bindings;
-  while (cur->type != NULL_TYPE)
-  {
-    //assert(cur->type == CONS_TYPE && "Should be cons type");
-    Value *pairList = car(cur);
-    //assert(pairList != NULL && pairList->type == CONS_TYPE);
-    Value *boundSymbol = car(pairList);
-    assert(boundSymbol->type == SYMBOL_TYPE);
-    if (!strcmp(boundSymbol->s, symbol->s)) // if boundSymbol is equal to symbol, return the boundValue
-    {
-      Value *boundValue = newVal;
-      if (boundValue->type == SYMBOL_TYPE)
-      {
-        return lookUpSymbol(boundValue, frame->parent);
-      } else if (boundValue->type == CONS_TYPE)
-      {
-        if (getBottomLeftChild(boundValue)->type == INT_TYPE || getBottomLeftChild(boundValue)->type == STR_TYPE || getBottomLeftChild(boundValue)->type == BOOL_TYPE || getBottomLeftChild(boundValue)->type == DOUBLE_TYPE)
-        {
-          return boundValue;
-        }
-        return eval(cdr(pairList), frame);
-      }
-      return boundValue;
-    }
-    cur = cdr(cur);
-  }
-  if (frame->parent == NULL)
-  {
-    return NULL;
-  }
-  return lookUpSymbol(symbol, frame->parent);
-}
+// Value *alterBinding(Value *symbol, Value *newVal, Frame *frame)
+// {
+//   Value *bindings = frame->bindings;
+//   Value *cur = bindings;
+//   while (cur->type != NULL_TYPE)
+//   {
+//     //assert(cur->type == CONS_TYPE && "Should be cons type");
+//     Value *pairList = car(cur);
+//     //assert(pairList != NULL && pairList->type == CONS_TYPE);
+//     Value *boundSymbol = car(pairList);
+//     assert(boundSymbol->type == SYMBOL_TYPE);
+//     if (!strcmp(boundSymbol->s, symbol->s)) // if boundSymbol is equal to symbol, return the boundValue
+//     {
+//       Value *boundValue = newVal;
+//       if (boundValue->type == SYMBOL_TYPE)
+//       {
+//         return lookUpSymbol(boundValue, frame->parent);
+//       } else if (boundValue->type == CONS_TYPE)
+//       {
+//         if (getBottomLeftChild(boundValue)->type == INT_TYPE || getBottomLeftChild(boundValue)->type == STR_TYPE || getBottomLeftChild(boundValue)->type == BOOL_TYPE || getBottomLeftChild(boundValue)->type == DOUBLE_TYPE)
+//         {
+//           return boundValue;
+//         }
+//         return eval(cdr(pairList), frame);
+//       }
+//       return boundValue;
+//     }
+//     cur = cdr(cur);
+//   }
+//   if (frame->parent == NULL)
+//   {
+//     return NULL;
+//   }
+//   return lookUpSymbol(symbol, frame->parent);
+// }
 
 Value *evalQuote(Value *tree){
   
@@ -249,16 +254,20 @@ Value *evalIf(Value *args, Frame *frame)
 Value *evalLet(Value *args, Frame *frame)
 {
   Frame *newFrame = talloc(sizeof(Frame));
-  newFrame->bindings = frame->bindings;
   newFrame->parent = frame;
   if (treeLength(args) < 1){
     evaluationError("Error: empty arguments to let");
   } else {
     newFrame->bindings = car(args);
     //appendBindingsTree(newFrame->bindings, frame->bindings);
-    
     Value* next = cdr(args);
-    return eval(next, newFrame);
+    Value* evaled;
+    while (next->type != NULL_TYPE)
+    {
+      evaled = eval(next, newFrame);
+      next = cdr(next);
+    }
+    return evaled;
   }
   return NULL;
 }
@@ -296,11 +305,68 @@ Value *evalLetStar(Value *args, Frame *frame)
   // return eval(next, newFrame);
 }
 
-// Value* evalLetRec(Value* args, Frame* frame)
-// {
-//   Value* bindingTreeHead = car(args);
+Value* evalLetRec(Value* args, Frame* frame)
+{
+  Value* bindingTreeHead = car(args);
+  Value* cur = car(args);
+
+  Value* exprTreeHead = makeNull();
+  while (cur->type != NULL_TYPE)
+  {
+    Value* var = car(cur); 
+    Value* expr = cdr(var); 
+
+    Value* temporaryCons = cons(makeUnspecified(), makeNull());
+    var->c.cdr = temporaryCons;
+
+    exprTreeHead = cons(expr, exprTreeHead);
+    cur = cdr(cur);
+  }
+  Frame* newFrame = talloc(sizeof(Frame));
+  newFrame->parent = frame;
+  newFrame->bindings = bindingTreeHead;
+
+  exprTreeHead = reverse(exprTreeHead);
+  cur = bindingTreeHead;
+  while (cur->type != NULL_TYPE)
+  {
+    Value* expr = car(exprTreeHead);
+    Value* var = car(cur);
+    Value* newExpr = cons(eval(expr, newFrame), makeNull());
+    var->c.cdr = newExpr;
+    cur = cdr(cur);
+    exprTreeHead = cdr(exprTreeHead);
+  }
+
   
-// }
+
+  return eval(cdr(args), newFrame);
+}
+
+Value* alterBinding(Value* symbol, Value* newVal, Frame* frame)
+{
+  Value* cur = frame->bindings;
+  while (cur->type != NULL_TYPE)
+  {
+    Value* sym = car(car(cur));
+    Value* exprTree = cdr(car(cur));
+    if (!strcmp(sym->s, symbol->s))
+    {
+      exprTree->c.car = newVal;
+      return newVal;
+    }
+    cur = cdr(cur);
+  }
+
+  if (frame->parent == NULL)
+  {
+    return NULL;
+  } else
+  {
+    return alterBinding(symbol, newVal, frame->parent);
+  }
+
+}
 
 Value *evalSetBang(Value *args, Frame *frame){
   if (args->type == NULL_TYPE){
@@ -312,12 +378,27 @@ Value *evalSetBang(Value *args, Frame *frame){
   if (car(args)->type != SYMBOL_TYPE){
     evaluationError("Evaluation error: first argument not of symbol type for set!");
   }
-  Value *updatedBinding = alterBinding(car(args),eval(cdr(args),frame), frame);
-  Value *special = talloc(sizeof(Value));
-  special->type = CONS_TYPE;
-  Value *specialchild = talloc(sizeof(Value));
-  special->type = VOID_TYPE;
-  return special;
+  Value* symbol = car(args);
+  Value* newVal = car(cdr(args));
+  
+  Value* ret = alterBinding(symbol, newVal, frame);
+  if (ret == NULL)
+  {
+    evaluationError("Set!: Symbol not found");
+  } else
+  {
+    Value* special = (Value*)talloc(sizeof(Value));
+    special->type = VOID_TYPE;
+    return special;
+  }
+  return NULL;
+  // Value *updatedBinding = alterBinding(car(args),eval(cdr(args),frame), frame);
+  // Value *special = talloc(sizeof(Value));
+  // special->type = CONS_TYPE;
+  // Value *specialchild = talloc(sizeof(Value));
+  // special->type = VOID_TYPE;
+  // return special;
+  
 }
 
 
@@ -330,8 +411,6 @@ Value *evalBegin (Value *args, Frame *frame){
     args = cdr(args);
   }
   Value *special = talloc(sizeof(Value));
-  special->type = CONS_TYPE;
-  Value *specialchild = talloc(sizeof(Value));
   special->type = VOID_TYPE;
   return special;
 }
@@ -777,10 +856,10 @@ Value *eval(Value *tree, Frame *frame)
       {
           return evalLetStar(cdr(val), frame);
       }
-      // if (!strcmp(car(val)->s, "letrec")) 
-      // {
-      //     return evalLetRec(cdr(val), frame);
-      // }
+      if (!strcmp(car(val)->s, "letrec")) 
+      {
+          return evalLetRec(cdr(val), frame);
+      }
       else
       {
         // If not a special form, evaluate the first, evaluate the args, then
