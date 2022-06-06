@@ -265,18 +265,41 @@ Value *evalLet(Value *args, Frame *frame)
 
 Value *evalLetStar(Value *args, Frame *frame)
 {
-  Frame *newFrame = talloc(sizeof(Frame));
-  if (treeLength(args) < 1){
-    evaluationError("Error: empty arguments to let");
-  } 
-  Value *curr = car(args);
-  while (curr->type != NULL_TYPE) {
-    newFrame->bindings = frame->bindings;
-    newFrame->parent = frame;
-    curr = cdr(curr);
+  Value* bindings = car(args);
+  Frame* newFrame = talloc(sizeof(Frame));
+  newFrame->parent = frame;
+  
+  newFrame->bindings = bindings;
+  bindings = cdr(bindings);
+  newFrame->bindings->c.cdr = makeNull();
+  if (bindings->type == NULL_TYPE)
+  {
+    return eval(cdr(args), newFrame);
   }
-  Value* next = cdr(args);
-  return eval(next, newFrame);
+  args->c.car = bindings;
+  // at this point, newFrame has only one binding, and it's the first binding.
+  // now we change args to point to the second binding, and we call evalLetStar again.
+  return evalLetStar(args, newFrame);
+
+
+  // Frame *newFrame = talloc(sizeof(Frame));
+  // if (treeLength(args) < 1){
+  //   evaluationError("Error: empty arguments to let");
+  // } 
+  // Value *curr = car(args);
+  // while (curr->type != NULL_TYPE) {
+  //   newFrame->bindings = frame->bindings;
+  //   newFrame->parent = frame;
+  //   curr = cdr(curr);
+  // }
+  // Value* next = cdr(args);
+  // return eval(next, newFrame);
+}
+
+Value* evalLetRec(Value* args, Frame* frame)
+{
+  Value* bindingTreeHead = car(args);
+  
 }
 
 Value *evalSetBang(Value *args, Frame *frame){
@@ -747,10 +770,10 @@ Value *eval(Value *tree, Frame *frame)
       {
           return evalLetStar(cdr(val), frame);
       }
-      // if (!strcmp(car(val)->s, "letrec")) 
-      // {
-      //     return evalLetRec(cdr(val), frame);
-      // }
+      if (!strcmp(car(val)->s, "letrec")) 
+      {
+          return evalLetRec(cdr(val), frame);
+      }
       else
       {
         // If not a special form, evaluate the first, evaluate the args, then

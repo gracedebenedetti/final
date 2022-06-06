@@ -1,5 +1,5 @@
 # Change "no" to "yes" to use our binaries
-USE_BINARIES = no
+USE_BINARIES = yes
 
 ifeq ($(USE_BINARIES),yes)
   SRCS = lib/linkedlist.o lib/talloc.o lib/tokenizer.o lib/parser.o \
